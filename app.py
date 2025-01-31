@@ -120,14 +120,12 @@ class EnhancedNewsProcessor:
             if entity['entity_group'] in ['ORG', 'PER', 'LOC']
         }
 
-# Streamlit UI Components
 @st.cache_resource
 def load_processor():
     return EnhancedNewsProcessor()
 
 processor = load_processor()
 
-# Sidebar Configuration
 with st.sidebar:
     st.header("AI Settings ⚙️")
     max_articles = st.slider("Articles to fetch", 5, 30, 10)
@@ -143,7 +141,6 @@ with st.sidebar:
     }
     target_lang = languages[translate_to] if translate_to != "None" else None
 
-# Main UI
 st.title("AI News Digest Pro 🤖")
 st.markdown("Advanced news analysis with multiple AI capabilities")
 
@@ -159,8 +156,7 @@ if st.button("🔄 Analyze Latest AI News"):
                 st.stop()
 
             progress_bar = st.progress(0)
-            results = []
-
+            
             for i, article in enumerate(articles):
                 analysis, error = processor.process_article(article, target_lang)
                 
@@ -170,25 +166,20 @@ if st.button("🔄 Analyze Latest AI News"):
 
                 with st.container():
                     # Header Section
-                    col1, col2 = st.columns([3, 1])
+                    col1, col2 = st.columns([4, 1])
                     with col1:
                         st.subheader(article["title"])
-                    with col2:
-                        st.markdown(
-                                f"""
-                                <div style="text-align: center;">
-                                    <span style="font-size: 20px; font-weight: bold;">Sentiment</span><br>
-                                    <span style="font-size: 24px; color: {'green' if analysis['sentiment']['label'] == 'positive' else 'red' if analysis['sentiment']['label'] == 'negative' else 'gray'};">
-                                        {analysis['sentiment']['label']} ({analysis['sentiment']['score']:.2f})
-                                    </span>
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                                    )
-
-                    # Metadata
-                    st.caption(f"**{article['source']['name']}** · {article['publishedAt']}")
+                        st.caption(f"**{article['source']['name']}** · {article['publishedAt']}")
                     
+                    with col2:
+                        st.markdown(f"""
+                        <div style="font-size:0.9em; color:#666; margin-top:0.8rem">
+                            <b>Sentiment</b><br>
+                            {analysis['sentiment']['label']}  
+                            <small>({analysis['sentiment']['score']:.2f})</small>
+                        </div>
+                        """, unsafe_allow_html=True)
+
                     # AI Analysis
                     with st.expander("View AI Analysis"):
                         st.markdown(f"**Summary**: {analysis['summary']}")
@@ -204,15 +195,32 @@ if st.button("🔄 Analyze Latest AI News"):
                     # Question Answering
                     user_question = st.text_input(
                         "Ask about this article:", 
-                        key=f"qa_{i}",
-                        placeholder="What technology does this mention?"
+                        key=f"qa_{article['url']}",
+                        placeholder="What technology does this mention?",
+                        help="Ask specific questions about the article content"
                     )
+                    
                     if user_question:
-                        answer = processor.ai.models["qa"](
-                            question=user_question,
-                            context=article['description'][:1024]
-                        )
-                        st.markdown(f"**Answer**: {answer['answer']} (Confidence: {answer['score']:.2f})")
+                        try:
+                            context = f"{article['title']}. {article.get('description', '')} {article.get('content', '')}"[:4096]
+                            
+                            answer = processor.ai.models["qa"](
+                                question=user_question,
+                                context=context,
+                                max_answer_len=100,
+                                handle_impossible_answer=True
+                            )
+                            
+                            if answer['score'] > 0.01:
+                                st.markdown(f"""
+                                    **Answer**: {answer['answer']}  
+                                    <small>(Confidence: {answer['score']:.2f})</small>
+                                """, unsafe_allow_html=True)
+                            else:
+                                st.warning("The article doesn't contain a clear answer to this question")
+                                
+                        except Exception as e:
+                            st.error(f"Couldn't process question: {str(e)}")
 
                     st.markdown(f"[Read Full Article ↗]({article['url']})")
                     st.divider()
