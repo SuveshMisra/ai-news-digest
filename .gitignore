@@ -1,0 +1,7 @@
+# Python
+__pycache__/
+gpu_venv/
+.env
+
+# System
+.DS_Store

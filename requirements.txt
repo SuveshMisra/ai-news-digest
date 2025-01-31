@@ -1,0 +1,7 @@
+streamlit>=1.28.0
+transformers>=4.34.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+torch>=2.0.1+cu118 --extra-index-url https://download.pytorch.org/whl/cu118
+accelerate>=0.21.0
+sentencepiece>=0.1.99
