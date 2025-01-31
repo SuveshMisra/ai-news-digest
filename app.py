@@ -174,8 +174,17 @@ if st.button("🔄 Analyze Latest AI News"):
                     with col1:
                         st.subheader(article["title"])
                     with col2:
-                        st.metric("Sentiment", 
-                                f"{analysis['sentiment']['label']} ({analysis['sentiment']['score']:.2f})")
+                        st.markdown(
+                                f"""
+                                <div style="text-align: center;">
+                                    <span style="font-size: 20px; font-weight: bold;">Sentiment</span><br>
+                                    <span style="font-size: 24px; color: {'green' if analysis['sentiment']['label'] == 'positive' else 'red' if analysis['sentiment']['label'] == 'negative' else 'gray'};">
+                                        {analysis['sentiment']['label']} ({analysis['sentiment']['score']:.2f})
+                                    </span>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                                    )
 
                     # Metadata
                     st.caption(f"**{article['source']['name']}** · {article['publishedAt']}")
