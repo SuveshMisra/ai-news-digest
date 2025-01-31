@@ -132,7 +132,6 @@ with st.sidebar:
     translate_to = st.selectbox("Translate summaries to", 
                               ["None", "Spanish", "French", "German", "Polish"])
     
-    # MBART-50 language codes
     languages = {
         "Spanish": "es_XX", 
         "French": "fr_XX",
@@ -145,89 +144,98 @@ st.title("AI News Digest Pro 🤖")
 st.markdown("Advanced news analysis with multiple AI capabilities")
 
 if st.button("🔄 Analyze Latest AI News"):
-    start_time = time.time()
+    st.session_state.articles = processor.news_client.get_ai_news(max_articles)
+
+if "articles" in st.session_state:
+    articles = st.session_state.articles
     
-    with st.spinner("Gathering and analyzing news..."):
-        try:
-            articles = processor.news_client.get_ai_news(max_articles)
-            
-            if not articles:
-                st.warning("No articles found. Try again later.")
-                st.stop()
+    if not articles:
+        st.warning("No articles found. Try again later.")
+        st.stop()
 
-            progress_bar = st.progress(0)
+    start_time = time.time()
+    progress_bar = st.progress(0)
+    
+    for i, article in enumerate(articles):
+        analysis, error = processor.process_article(article, target_lang)
+        
+        if error:
+            st.error(f"Error processing article: {error}")
+            continue
+
+        with st.container():
+            # Header Section
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.subheader(article["title"])
+                st.caption(f"**{article['source']['name']}** · {article['publishedAt']}")
             
-            for i, article in enumerate(articles):
-                analysis, error = processor.process_article(article, target_lang)
+            with col2:
+                st.markdown(f"""
+                <div style="font-size:0.9em; color:#666; margin-top:0.8rem">
+                    <b>Sentiment</b><br>
+                    {analysis['sentiment']['label']}  
+                    <small>({analysis['sentiment']['score']:.2f})</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # AI Analysis
+            with st.expander("View AI Analysis"):
+                st.markdown(f"**Summary**: {analysis['summary']}")
                 
-                if error:
-                    st.error(f"Error processing article: {error}")
-                    continue
-
-                with st.container():
-                    # Header Section
-                    col1, col2 = st.columns([4, 1])
-                    with col1:
-                        st.subheader(article["title"])
-                        st.caption(f"**{article['source']['name']}** · {article['publishedAt']}")
+                if target_lang:
+                    st.markdown(f"**Translated ({translate_to})**: {analysis['translation']}")
                     
-                    with col2:
-                        st.markdown(f"""
-                        <div style="font-size:0.9em; color:#666; margin-top:0.8rem">
-                            <b>Sentiment</b><br>
-                            {analysis['sentiment']['label']}  
-                            <small>({analysis['sentiment']['score']:.2f})</small>
-                        </div>
-                        """, unsafe_allow_html=True)
+                if analysis['entities']:
+                    st.markdown("**Key Entities**:")
+                    for entity, group in analysis['entities'].items():
+                        st.code(f"{entity} ({group})")
 
-                    # AI Analysis
-                    with st.expander("View AI Analysis"):
-                        st.markdown(f"**Summary**: {analysis['summary']}")
+            # Question Answering Form
+            with st.form(key=f"qa_form_{article['url']}"):
+                user_question = st.text_input(
+                    "Ask about this article:", 
+                    key=f"qa_input_{article['url']}",
+                    placeholder="What technology does this mention?",
+                    help="Ask specific questions about the article content"
+                )
+                
+                submitted = st.form_submit_button("Get Answer")
+                
+                if submitted and user_question:
+                    try:
+                        context = f"{article['title']}. {article.get('description', '')} {article.get('content', '')}"[:4096]
                         
-                        if target_lang:
-                            st.markdown(f"**Translated ({translate_to})**: {analysis['translation']}")
+                        answer = processor.ai.models["qa"](
+                            question=user_question,
+                            context=context,
+                            max_answer_len=100,
+                            handle_impossible_answer=True
+                        )
+                        
+                        if answer['score'] > 0.01:
+                            st.session_state[f"answer_{article['url']}"] = {
+                                'question': user_question,
+                                'answer': answer
+                            }
+                        else:
+                            st.warning("The article doesn't contain a clear answer to this question")
                             
-                        if analysis['entities']:
-                            st.markdown("**Key Entities**:")
-                            for entity, group in analysis['entities'].items():
-                                st.code(f"{entity} ({group})")
+                    except Exception as e:
+                        st.error(f"Couldn't process question: {str(e)}")
 
-                    # Question Answering
-                    user_question = st.text_input(
-                        "Ask about this article:", 
-                        key=f"qa_{article['url']}",
-                        placeholder="What technology does this mention?",
-                        help="Ask specific questions about the article content"
-                    )
-                    
-                    if user_question:
-                        try:
-                            context = f"{article['title']}. {article.get('description', '')} {article.get('content', '')}"[:4096]
-                            
-                            answer = processor.ai.models["qa"](
-                                question=user_question,
-                                context=context,
-                                max_answer_len=100,
-                                handle_impossible_answer=True
-                            )
-                            
-                            if answer['score'] > 0.01:
-                                st.markdown(f"""
-                                    **Answer**: {answer['answer']}  
-                                    <small>(Confidence: {answer['score']:.2f})</small>
-                                """, unsafe_allow_html=True)
-                            else:
-                                st.warning("The article doesn't contain a clear answer to this question")
-                                
-                        except Exception as e:
-                            st.error(f"Couldn't process question: {str(e)}")
+            # Display stored answer if exists
+            if f"answer_{article['url']}" in st.session_state:
+                answer_data = st.session_state[f"answer_{article['url']}"]
+                st.markdown(f"""
+                    **Question**: {answer_data['question']}  
+                    **Answer**: {answer_data['answer']['answer']}  
+                    <small>(Confidence: {answer_data['answer']['score']:.2f})</small>
+                """, unsafe_allow_html=True)
 
-                    st.markdown(f"[Read Full Article ↗]({article['url']})")
-                    st.divider()
+            st.markdown(f"[Read Full Article ↗]({article['url']})")
+            st.divider()
+        
+        progress_bar.progress((i + 1) / len(articles))
 
-                progress_bar.progress((i + 1) / len(articles))
-
-            st.success(f"✅ Analyzed {len(articles)} articles in {time.time()-start_time:.1f}s")
-
-        except Exception as e:
-            st.error(f"Critical error: {str(e)}")
+    st.success(f"✅ Analyzed {len(articles)} articles in {time.time()-start_time:.1f}s")
