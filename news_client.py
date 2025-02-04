@@ -5,14 +5,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-class GNewsClient:
+class NewsClient:
     def __init__(self):
         self.api_key = os.getenv("GNEWS_API_KEY")
         self.base_url = "https://gnews.io/api/v4/search"
     
-    def get_ai_news(self, max_articles=15):
+    def get_news(self, topic="artificial intelligence", max_articles=15):
         params = {
-            "q": "artificial intelligence",
+            "q": topic,
             "lang": "en",
             "max": max_articles,
             "in": "title,description",
