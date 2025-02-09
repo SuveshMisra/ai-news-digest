@@ -10,11 +10,11 @@ class NewsClient:
         self.api_key = os.getenv("GNEWS_API_KEY")
         self.base_url = "https://gnews.io/api/v4/search"
     
-    def get_news(self, topic="artificial intelligence", max_articles=15):
+    def get_news(self, topic, max_articles=10):  # Changed default to match UI
         params = {
             "q": topic,
             "lang": "en",
-            "max": max_articles,
+            "max": max_articles,  # Now properly passed from UI
             "in": "title,description",
             "sortby": "publishedAt",
             "apikey": self.api_key

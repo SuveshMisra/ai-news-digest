@@ -91,7 +91,16 @@ if st.button("🔄 Analyze Latest News"):
     
     with st.spinner(f"Gathering {news_topic} news..."):
         try:
-            articles = processor.news_client.get_news(news_topic, max_articles)
+            # Force fresh fetch with current parameters
+            articles = processor.news_client.get_news(
+                topic=news_topic,
+                max_articles=max_articles  # Explicit parameter passing
+            )
+            
+            # Clear cache and store new articles
+            if 'articles' in st.session_state:
+                del st.session_state['articles']
+            st.session_state.articles = articles
             
             if not articles:
                 st.warning("No articles found. Try a different topic or try again later.")
